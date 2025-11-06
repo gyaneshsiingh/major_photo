@@ -338,6 +338,8 @@ from scipy.signal import find_peaks
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, StackingRegressor
 from sklearn.svm import SVR
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel, WhiteKernel
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.linear_model import Ridge
 from sklearn.metrics import r2_score
@@ -416,11 +418,20 @@ def train_and_select_ensemble(csv_path="nm RGB.csv", force_retrain=False):
     X = df.drop(columns=["nm"])
     y = df["nm"].values
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
+    kernel = ConstantKernel(1e5, (1e2, 1e8)) * \
+    RBF(length_scale=np.ones(X.shape[1]), length_scale_bounds=(1e-3, 1e3)) + \
+    WhiteKernel(noise_level=1, noise_level_bounds=(1e-5, 1e3))
 
+    gpr = GaussianProcessRegressor(
+        kernel=kernel,
+        normalize_y=True,
+        n_restarts_optimizer=5,
+        random_state=42
+    )
     base_models = {
         "rf": RandomForestRegressor(n_estimators=200, random_state=42),
         "gbr": GradientBoostingRegressor(random_state=42),
-        "svr": SVR(kernel="rbf"),
+        "svr": gpr,
         "knn": KNeighborsRegressor(n_neighbors=5)
     }
     if XG_AVAILABLE:
